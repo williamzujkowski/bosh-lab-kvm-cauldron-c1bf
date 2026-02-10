@@ -28,7 +28,9 @@ else
   echo "[install-tools] Installing credhub-cli ${CREDHUB_CLI_VERSION}..."
   curl -sSL "https://github.com/cloudfoundry/credhub-cli/releases/download/${CREDHUB_CLI_VERSION}/credhub-linux-amd64-${CREDHUB_CLI_VERSION}.tgz" -o /tmp/credhub.tgz
   mkdir -p /tmp/credhub-extract
-  tar xzf /tmp/credhub.tgz -C /tmp/credhub-extract
+  # --no-same-owner: avoid permission errors when extracting as non-root
+  # || true: tar may warn about utime on '.' which is non-fatal
+  tar xzf /tmp/credhub.tgz -C /tmp/credhub-extract --no-same-owner || true
   sudo mv /tmp/credhub-extract/credhub /usr/local/bin/credhub
   rm -rf /tmp/credhub.tgz /tmp/credhub-extract
   echo "[install-tools] credhub-cli installed: $(credhub --version)"
@@ -41,7 +43,7 @@ else
   echo "[install-tools] Installing fly ${FLY_VERSION}..."
   curl -sSL "https://github.com/concourse/concourse/releases/download/v${FLY_VERSION}/fly-${FLY_VERSION}-linux-amd64.tgz" -o /tmp/fly.tgz
   mkdir -p /tmp/fly-extract
-  tar xzf /tmp/fly.tgz -C /tmp/fly-extract
+  tar xzf /tmp/fly.tgz -C /tmp/fly-extract --no-same-owner || true
   sudo mv /tmp/fly-extract/fly /usr/local/bin/fly
   rm -rf /tmp/fly.tgz /tmp/fly-extract
   echo "[install-tools] fly installed: $(fly --version)"
