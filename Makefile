@@ -32,7 +32,7 @@ MGMT_IP     := 10.245.0.2
 SSH_KEY     := $(STATE_DIR)/creds/mgmt_ssh
 SSH_OPTS    := -i $(SSH_KEY) -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o LogLevel=ERROR
 
-.PHONY: help up bootstrap concourse env test status logs down reset doctor image
+.PHONY: help up bootstrap concourse env test status logs down reset doctor image setup
 
 help: ## Show this help
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | \
@@ -42,6 +42,9 @@ help: ## Show this help
 
 $(STATE_DIR):
 	mkdir -p $(STATE_DIR)/{creds,ca,cache,logs}
+
+setup: ## One-time libvirt config (requires sudo)
+	@sudo $(REPO_ROOT)/scripts/setup-libvirt.sh
 
 image: $(STATE_DIR) ## Download Ubuntu cloud image (cached)
 	@if [ -f "$(CLOUD_IMAGE)" ]; then \
@@ -72,6 +75,11 @@ up: doctor image $(STATE_DIR) ## Provision infrastructure (Terraform)
 		-var="cloud_image_path=$(CLOUD_IMAGE)" \
 		-var="cloud_init_path=$(STATE_DIR)/mgmt-cloudinit.yaml" \
 		-var="state_dir=$(STATE_DIR)"
+	@# Fix cloud-init ISO directory permissions for QEMU access
+	@chmod 711 /tmp/terraform-provider-libvirt-cloudinit 2>/dev/null || true
+	@echo "==> Starting VM..."
+	@virsh start bosh-lab-mgmt
+	@virsh autostart bosh-lab-mgmt
 	@echo "==> Infrastructure provisioned. VM at $(MGMT_IP)."
 	@echo "    Run 'make bootstrap' next."
 
@@ -178,6 +186,15 @@ doctor: ## Check host prerequisites
 	CPUS=$$(nproc); \
 	if [ "$$CPUS" -ge 8 ]; then echo "  OK: $$CPUS threads (>= 8 recommended)"; \
 	else echo "  WARN: $$CPUS threads. 8+ recommended."; fi; \
+	echo "--- QEMU security ---"; \
+	if sudo -n grep -q '^security_driver = "none"' /etc/libvirt/qemu.conf 2>/dev/null; then \
+		echo "  OK: security_driver = none (lab mode)"; \
+	elif sudo -n cat /etc/libvirt/qemu.conf 2>/dev/null | grep -q 'security_driver = "none"'; then \
+		echo "  OK: security_driver = none (lab mode)"; \
+	else \
+		echo "  WARN: Cannot verify QEMU security config (needs sudo)."; \
+		echo "        If VM fails to start, run: make setup"; \
+	fi; \
 	echo "--- State dir ---"; \
 	if [ -d "$(STATE_DIR)" ]; then echo "  OK: ./state exists"; \
 	else echo "  INFO: ./state does not exist (will be created on 'make up')"; fi; \

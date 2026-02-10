@@ -121,6 +121,10 @@ resource "libvirt_cloudinit_disk" "mgmt_init" {
 resource "libvirt_domain" "mgmt" {
   name        = var.vm_name
   type        = "kvm"
+  # VM started via post-provisioning (see Makefile)
+  # running/autostart set after security_driver config
+  running     = false
+  autostart   = false
   memory      = var.memory_mb
   memory_unit = "MiB"
   vcpu        = var.vcpu
@@ -133,10 +137,18 @@ resource "libvirt_domain" "mgmt" {
     mode = "host-passthrough"
   }
 
+  # Disable security labeling — dev lab, not production
+  sec_label = [{
+    type = "none"
+  }]
+
   devices = {
     interfaces = [{
       mac = {
         address = "52:54:00:b0:5e:02"
+      }
+      model = {
+        type = "virtio"
       }
       source = {
         network = {
@@ -147,6 +159,10 @@ resource "libvirt_domain" "mgmt" {
 
     disks = [
       {
+        driver = {
+          name = "qemu"
+          type = "qcow2"
+        }
         target = {
           dev = "vda"
           bus = "virtio"
@@ -176,6 +192,10 @@ resource "libvirt_domain" "mgmt" {
       target = {
         type = "serial"
         port = 0
+      }
+      log = {
+        file   = "${var.state_dir}/logs/console.log"
+        append = "off"
       }
     }]
 
