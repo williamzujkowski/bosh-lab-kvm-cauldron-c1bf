@@ -18,7 +18,7 @@ variable "static_ip" {
   type = string
 }
 
-variable "network_id" {
+variable "network_name" {
   type = string
 }
 
@@ -42,74 +42,125 @@ variable "pool_path" {
 resource "libvirt_pool" "bosh_lab" {
   name = "bosh-lab"
   type = "dir"
-  path = var.pool_path
+  target = {
+    path = var.pool_path
+  }
 }
 
 # Base image volume (uploaded once from cloud image)
 resource "libvirt_volume" "ubuntu_base" {
-  name   = "${var.vm_name}-base.qcow2"
-  pool   = libvirt_pool.bosh_lab.name
-  source = var.cloud_image_path
-  format = "qcow2"
+  name = "${var.vm_name}-base.qcow2"
+  pool = libvirt_pool.bosh_lab.name
+  target = {
+    format = {
+      type = "qcow2"
+    }
+  }
+  create = {
+    content = {
+      url = var.cloud_image_path
+    }
+  }
 }
 
 # Root disk (COW clone of base, resized)
 resource "libvirt_volume" "mgmt_root" {
-  name           = "${var.vm_name}-root.qcow2"
-  pool           = libvirt_pool.bosh_lab.name
-  base_volume_id = libvirt_volume.ubuntu_base.id
-  format         = "qcow2"
-  size           = var.disk_gb * 1024 * 1024 * 1024
+  name     = "${var.vm_name}-root.qcow2"
+  pool     = libvirt_pool.bosh_lab.name
+  capacity = var.disk_gb * 1024 * 1024 * 1024
+  target = {
+    format = {
+      type = "qcow2"
+    }
+  }
+  backing_store = {
+    path = libvirt_volume.ubuntu_base.path
+    format = {
+      type = "qcow2"
+    }
+  }
 }
 
 # Cloud-init ISO
 resource "libvirt_cloudinit_disk" "mgmt_init" {
   name      = "${var.vm_name}-cloudinit.iso"
-  pool      = libvirt_pool.bosh_lab.name
   user_data = file(var.cloud_init_path)
+  meta_data = yamlencode({
+    instance-id    = var.vm_name
+    local-hostname = var.vm_name
+  })
 }
 
 # Management VM
 resource "libvirt_domain" "mgmt" {
-  name   = var.vm_name
-  memory = var.memory_mb
-  vcpu   = var.vcpu
+  name        = var.vm_name
+  type        = "kvm"
+  memory      = var.memory_mb
+  memory_unit = "MiB"
+  vcpu        = var.vcpu
 
-  cloudinit = libvirt_cloudinit_disk.mgmt_init.id
-
-  cpu {
+  cpu = {
     mode = "host-passthrough"
   }
 
-  network_interface {
-    network_id     = var.network_id
-    addresses      = [var.static_ip]
-    wait_for_lease = false
-  }
+  devices = {
+    interfaces = [{
+      source = {
+        network = {
+          network = var.network_name
+        }
+      }
+      ip = [{
+        address = var.static_ip
+      }]
+    }]
 
-  disk {
-    volume_id = libvirt_volume.mgmt_root.id
-  }
+    disks = [
+      {
+        source = {
+          volume = {
+            pool   = libvirt_pool.bosh_lab.name
+            volume = libvirt_volume.mgmt_root.name
+          }
+        }
+      },
+      {
+        device = "cdrom"
+        source = {
+          file = {
+            file = libvirt_cloudinit_disk.mgmt_init.path
+          }
+        }
+      }
+    ]
 
-  console {
-    type        = "pty"
-    target_type = "serial"
-    target_port = "0"
-  }
+    consoles = [{
+      target = {
+        type = "serial"
+        port = 0
+      }
+    }]
 
-  graphics {
-    type        = "vnc"
-    listen_type = "address"
-    listen_address = "127.0.0.1"
-    autoport    = true
-  }
+    graphics = [{
+      vnc = {
+        listen    = "127.0.0.1"
+        auto_port = true
+      }
+    }]
 
-  # Share state directory with VM via 9p filesystem
-  filesystem {
-    source   = var.state_dir
-    target   = "state"
-    readonly = false
-    accessmode = "mapped"
+    # Share state directory with VM via 9p filesystem
+    filesystems = [{
+      access_mode = "mapped"
+      read_only   = false
+      source = {
+        mount = {
+          dir = var.state_dir
+        }
+      }
+      target = {
+        dir = "state"
+      }
+    }]
   }
 
   provisioner "local-exec" {

@@ -12,19 +12,21 @@ variable "network_gateway" {
 
 resource "libvirt_network" "bosh_lab" {
   name      = var.network_name
-  mode      = "nat"
   autostart = true
 
-  addresses = [var.network_cidr]
-
-  dns {
-    enabled = true
+  forward = {
+    mode = "nat"
   }
 
-  # Do NOT provide DHCP — BOSH manages IP assignment via CPI
-  dhcp {
-    enabled = false
+  dns = {
+    enable = "yes"
   }
+
+  # No DHCP — BOSH manages IP assignment via CPI
+  ips = [{
+    address = var.network_gateway
+    prefix  = tonumber(split("/", var.network_cidr)[1])
+  }]
 }
 
 output "network_id" {
