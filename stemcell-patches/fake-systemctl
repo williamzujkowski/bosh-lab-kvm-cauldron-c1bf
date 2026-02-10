@@ -1,0 +1,17 @@
+#!/bin/sh
+# fake-systemctl — Translates systemd commands to runit equivalents
+# Used in Garden containers where systemd isn't available.
+case "$1" in
+  start)
+    shift; sv start "$@" 2>/dev/null; exit $?;;
+  stop)
+    shift; sv stop "$@" 2>/dev/null; exit $?;;
+  restart)
+    shift; sv restart "$@" 2>/dev/null; exit $?;;
+  status)
+    shift; sv status "$@" 2>/dev/null; exit $?;;
+  enable|disable|daemon-reload|is-active|is-enabled)
+    exit 0;;
+  *)
+    exit 0;;
+esac

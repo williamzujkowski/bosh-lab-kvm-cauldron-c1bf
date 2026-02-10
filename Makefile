@@ -24,8 +24,8 @@ TF_DIR      := $(REPO_ROOT)/terraform
 TF_ENV      := $(TF_DIR)/envs/laptop
 CLOUD_INIT  := $(REPO_ROOT)/cloud-init/mgmt.yaml
 CACHE_DIR   := $(STATE_DIR)/cache
-CLOUD_IMAGE := $(CACHE_DIR)/jammy-server-cloudimg-amd64.img
-CLOUD_IMAGE_URL := https://cloud-images.ubuntu.com/jammy/current/jammy-server-cloudimg-amd64.img
+CLOUD_IMAGE := $(CACHE_DIR)/noble-server-cloudimg-amd64.img
+CLOUD_IMAGE_URL := https://cloud-images.ubuntu.com/noble/current/noble-server-cloudimg-amd64.img
 
 # VM access
 MGMT_IP     := 10.245.0.2
@@ -50,7 +50,7 @@ image: $(STATE_DIR) ## Download Ubuntu cloud image (cached)
 	@if [ -f "$(CLOUD_IMAGE)" ]; then \
 		echo "[image] Cloud image already cached."; \
 	else \
-		echo "[image] Downloading Ubuntu 22.04 cloud image..."; \
+		echo "[image] Downloading Ubuntu 24.04 cloud image..."; \
 		mkdir -p $(CACHE_DIR); \
 		curl -sSL -o "$(CLOUD_IMAGE)" "$(CLOUD_IMAGE_URL)"; \
 		echo "[image] Downloaded to $(CLOUD_IMAGE)"; \
@@ -92,8 +92,8 @@ concourse: ## Deploy Concourse via BOSH
 	@echo "==> Deploying Concourse..."
 	$(REPO_ROOT)/bootstrap/bootstrap.sh --concourse-only
 	@echo "==> Concourse deployed."
-	@echo "    Set up SSH tunnel: ssh $(SSH_OPTS) -L 8443:10.245.0.10:443 bosh@$(MGMT_IP)"
-	@echo "    Then visit: https://127.0.0.1:8443"
+	@echo "    Set up SSH tunnel: ssh $(SSH_OPTS) -L 8080:10.245.0.10:8080 bosh@$(MGMT_IP)"
+	@echo "    Then visit: http://127.0.0.1:8080"
 
 env: ## Print shell exports for bosh/credhub CLIs
 	@$(REPO_ROOT)/scripts/env.sh

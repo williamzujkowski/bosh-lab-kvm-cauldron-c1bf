@@ -53,7 +53,7 @@ variable "mgmt_vm_ip" {
 }
 
 variable "cloud_image_path" {
-  description = "Path to the Ubuntu 22.04 cloud image (qcow2)"
+  description = "Path to the Ubuntu 24.04 cloud image (qcow2)"
   type        = string
 }
 

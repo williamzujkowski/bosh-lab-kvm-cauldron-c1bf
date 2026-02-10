@@ -1,0 +1,2 @@
+#!/bin/sh
+exec /var/vcap/bosh/bin/monit -I -c /var/vcap/bosh/etc/monitrc

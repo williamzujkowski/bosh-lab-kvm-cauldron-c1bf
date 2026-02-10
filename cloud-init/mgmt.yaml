@@ -1,6 +1,6 @@
 #cloud-config
 # Management VM cloud-init for BOSH lab
-# OS: Ubuntu 22.04 LTS (Jammy)
+# OS: Ubuntu 24.04 LTS (Noble)
 
 hostname: bosh-lab-mgmt
 manage_etc_hosts: true
@@ -9,7 +9,7 @@ timezone: UTC
 
 users:
   - name: bosh
-    groups: sudo
+    groups: sudo, docker
     shell: /bin/bash
     sudo: ALL=(ALL) NOPASSWD:ALL
     lock_passwd: true
@@ -32,19 +32,25 @@ packages:
   - libpq-dev
   - libmysqlclient-dev
   - zlib1g-dev
-  - qemu-kvm
+  - qemu-system-x86
   - libvirt-daemon-system
   - libvirt-dev
   - virtinst
   - bridge-utils
   - ca-certificates
   - openssh-server
+  - docker.io
 
 # Mount host state directory via 9p
 mounts:
   - ["state", "/mnt/state", "9p", "trans=virtio,version=9p2000.L,rw", "0", "0"]
 
 # Ensure mount point exists
+swap:
+  filename: /swapfile
+  size: 4294967296  # 4 GB
+  maxsize: 4294967296
+
 runcmd:
   - mkdir -p /mnt/state
   - mount -a || true

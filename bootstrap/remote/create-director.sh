@@ -2,6 +2,10 @@
 # create-director.sh — Runs INSIDE the mgmt VM
 # Creates (or converges) BOSH Director with CredHub enabled using bosh-deployment.
 # Idempotent: re-running will converge the director, not recreate it.
+#
+# NOTE: bosh create-env may disrupt VM networking (Garden/warden container setup).
+# This script runs create-env via nohup so it survives SSH disconnection.
+# The calling script (bootstrap.sh) polls for completion.
 
 set -euo pipefail
 
@@ -9,8 +13,15 @@ BOSH_DEPLOYMENT_COMMIT="faf834a"
 STATE_DIR="/mnt/state"
 LOCAL_STATE="/home/bosh/state"
 DEPLOY_DIR="/home/bosh/bosh-deployment"
+CREATE_ENV_LOG="/home/bosh/state/create-env.log"
+CREATE_ENV_PID="/home/bosh/state/create-env.pid"
+CREATE_ENV_RC="/home/bosh/state/create-env.rc"
 
 mkdir -p "$LOCAL_STATE" "$STATE_DIR/creds"
+
+# --- Ensure Garden is running (required by warden CPI) ---
+echo "[create-director] Setting up Garden..."
+/home/bosh/bootstrap/remote/setup-garden.sh
 
 # --- Clone or update bosh-deployment ---
 if [ -d "$DEPLOY_DIR" ]; then
@@ -32,7 +43,6 @@ else
 fi
 
 # --- Determine state file locations ---
-# If vars-store exists in host state, use it (cattle pattern)
 VARS_STORE="${STATE_DIR}/vars-store.yml"
 DIRECTOR_STATE="${STATE_DIR}/creds/director-state.json"
 
@@ -40,47 +50,74 @@ DIRECTOR_STATE="${STATE_DIR}/creds/director-state.json"
 touch "$VARS_STORE"
 [ -f "$DIRECTOR_STATE" ] || echo '{}' > "$DIRECTOR_STATE"
 
+# --- Check if create-env is already running ---
+if [ -f "$CREATE_ENV_PID" ]; then
+  OLD_PID=$(cat "$CREATE_ENV_PID")
+  if kill -0 "$OLD_PID" 2>/dev/null; then
+    echo "[create-director] bosh create-env already running (PID $OLD_PID). Waiting..."
+    echo "RUNNING"
+    exit 0
+  fi
+fi
+
 # --- Check if director already exists ---
-if bosh env --environment 10.245.0.2 2>/dev/null; then
-  echo "[create-director] Director already running. Converging..."
+if bosh env --environment 192.168.50.6 2>/dev/null; then
+  echo "[create-director] Director already running."
+  echo "DONE"
+  exit 0
+fi
+
+# --- Check if a previous run completed ---
+if [ -f "$CREATE_ENV_RC" ]; then
+  RC=$(cat "$CREATE_ENV_RC")
+  if [ "$RC" = "0" ]; then
+    echo "[create-director] Previous create-env succeeded."
+    echo "DONE"
+    exit 0
+  else
+    echo "[create-director] Previous create-env failed (rc=$RC). Retrying..."
+    rm -f "$CREATE_ENV_RC" "$CREATE_ENV_PID"
+  fi
 fi
 
 # --- Create/converge BOSH Director ---
-echo "[create-director] Running bosh create-env..."
-bosh create-env "${DEPLOY_DIR}/bosh.yml" \
-  --state="$DIRECTOR_STATE" \
-  --vars-store="$VARS_STORE" \
-  -o "${DEPLOY_DIR}/warden/cpi.yml" \
-  -o "${DEPLOY_DIR}/bosh-lite.yml" \
-  -o "${DEPLOY_DIR}/bosh-lite-runc.yml" \
-  -o "${DEPLOY_DIR}/warden/use-jammy.yml" \
-  -o "${DEPLOY_DIR}/uaa.yml" \
-  -o "${DEPLOY_DIR}/credhub.yml" \
-  -o "${DEPLOY_DIR}/jumpbox-user.yml" \
-  -v director_name=bosh-lab \
-  -v internal_ip=10.245.0.2 \
-  -v internal_gw=10.245.0.1 \
-  -v internal_cidr=10.245.0.0/24 \
-  -v garden_host=127.0.0.1 \
-  2>&1
+# Run create-env via nohup so it survives SSH disconnection.
+# Garden container networking may disrupt VM SSH connectivity.
+echo "[create-director] Running bosh create-env (detached)..."
+rm -f "$CREATE_ENV_RC"
 
-# --- Alias the environment ---
-echo "[create-director] Setting up BOSH environment alias 'lab'..."
-bosh alias-env lab \
-  -e 10.245.0.2 \
-  --ca-cert <(bosh int "$VARS_STORE" --path /director_ssl/ca)
+# Stemcell patches fix Noble stemcell issues in Garden containers:
+# - Missing runsvdir-start (Noble uses systemd, Garden needs runit)
+# - BPM binary incompatible with cgroup2
+# - Missing monit runit service definitions
+# The watcher runs alongside create-env and patches the stemcell volume
+# as soon as Garden creates it.
+PATCH_WATCHER="/home/bosh/stemcell-patches/watch-and-patch.sh"
 
-# --- Log in ---
-echo "[create-director] Logging in to BOSH Director..."
-export BOSH_CLIENT=admin
-export BOSH_CLIENT_SECRET
-BOSH_CLIENT_SECRET=$(bosh int "$VARS_STORE" --path /admin_password)
+nohup bash -c '
+  # Start stemcell volume patcher in background
+  if [ -x "'"$PATCH_WATCHER"'" ]; then
+    "'"$PATCH_WATCHER"'" &
+  fi
 
-bosh -e lab env
+  bosh create-env "'"${DEPLOY_DIR}"'/bosh.yml" \
+    --state="'"$DIRECTOR_STATE"'" \
+    --vars-store="'"$VARS_STORE"'" \
+    -o "'"${DEPLOY_DIR}"'/bosh-lite.yml" \
+    -o "'"${DEPLOY_DIR}"'/bosh-lite-runc.yml" \
+    -o /home/bosh/manifests/director/ops/warden-cloud-provider.yml \
+    -o "'"${DEPLOY_DIR}"'/uaa.yml" \
+    -o "'"${DEPLOY_DIR}"'/credhub.yml" \
+    -o "'"${DEPLOY_DIR}"'/jumpbox-user.yml" \
+    -v director_name=bosh-lab \
+    -v internal_ip=192.168.50.6 \
+    -v internal_gw=192.168.50.1 \
+    -v internal_cidr=192.168.50.0/24 \
+    2>&1
+  echo $? > "'"$CREATE_ENV_RC"'"
+' > "$CREATE_ENV_LOG" 2>&1 &
 
-# --- Copy vars-store to host state for persistence ---
-cp "$VARS_STORE" "${STATE_DIR}/vars-store.yml"
-cp "$DIRECTOR_STATE" "${STATE_DIR}/creds/director-state.json"
-
-echo "[create-director] Director created and verified."
-echo "[create-director] BOSH environment 'lab' is ready."
+echo $! > "$CREATE_ENV_PID"
+echo "[create-director] bosh create-env started (PID $(cat "$CREATE_ENV_PID"))."
+echo "[create-director] Log: $CREATE_ENV_LOG"
+echo "STARTED"

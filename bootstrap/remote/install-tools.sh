@@ -47,4 +47,14 @@ else
   echo "[install-tools] fly installed: $(fly --version)"
 fi
 
+echo "[install-tools] Checking Docker..."
+if command -v docker &>/dev/null; then
+  echo "[install-tools] Docker $(docker --version 2>/dev/null | cut -d' ' -f3 | tr -d ',') already installed."
+else
+  echo "[install-tools] Installing Docker..."
+  sudo apt-get install -y docker.io
+  sudo usermod -aG docker bosh
+  echo "[install-tools] Docker installed: $(docker --version)"
+fi
+
 echo "[install-tools] All tools installed."

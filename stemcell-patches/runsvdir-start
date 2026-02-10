@@ -1,0 +1,51 @@
+#!/bin/bash
+# runsvdir-start — Container init for BOSH stemcell Noble
+# Sets up runit service management and patches for Garden containers.
+
+# Fix agent.json ServiceManager (must be "" for runit, not "systemd")
+AGENT_JSON=/var/vcap/bosh/agent.json
+if [ -f "$AGENT_JSON" ]; then
+  if grep -q '"ServiceManager"' "$AGENT_JSON" 2>/dev/null; then
+    sed -i 's/"ServiceManager": *"[^"]*"/"ServiceManager": ""/' "$AGENT_JSON"
+  fi
+fi
+
+# Ensure runit service dirs exist
+mkdir -p /etc/sv/monit/log /var/vcap/monit
+
+# Write monit runit run script if missing
+if [ ! -f /etc/sv/monit/run ]; then
+  cat > /etc/sv/monit/run << 'MONIT_RUN'
+#!/bin/sh
+exec /var/vcap/bosh/bin/monit -I -c /var/vcap/bosh/etc/monitrc
+MONIT_RUN
+  chmod +x /etc/sv/monit/run
+fi
+
+# Write monit log run script if missing
+if [ ! -f /etc/sv/monit/log/run ]; then
+  cat > /etc/sv/monit/log/run << 'LOG_RUN'
+#!/bin/sh
+exec svlogd -tt /var/vcap/monit/
+LOG_RUN
+  chmod +x /etc/sv/monit/log/run
+fi
+
+# Ensure service symlink
+[ -L /etc/service/monit ] || ln -sf /etc/sv/monit /etc/service/monit
+
+# Start BPM patcher in background — waits for BPM job to be installed
+# then replaces the BPM wrapper with our cgroup2-safe shim
+(
+  while [ ! -f /var/vcap/jobs/bpm/bin/bpm ]; do sleep 3; done
+  sleep 1
+
+  # Check if it's the real BPM wrapper (calls the Go binary)
+  if grep -q '/var/vcap/packages/bpm/bin/bpm' /var/vcap/jobs/bpm/bin/bpm 2>/dev/null; then
+    cp /usr/sbin/bpm-shim /var/vcap/jobs/bpm/bin/bpm
+    chmod +x /var/vcap/jobs/bpm/bin/bpm
+  fi
+) &
+
+# Start runit
+exec /usr/bin/runsvdir -P /etc/service/

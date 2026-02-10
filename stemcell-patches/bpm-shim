@@ -1,0 +1,183 @@
+#!/bin/bash
+set -e
+ulimit -n 524288
+
+ACTION="${1:-}"
+JOB="${2:-}"
+PROCESS_NAME=""
+shift 2 2>/dev/null || true
+while [ $# -gt 0 ]; do
+  case "$1" in
+    -p) PROCESS_NAME="$2"; shift 2 ;;
+    *) shift ;;
+  esac
+done
+
+PROC="${PROCESS_NAME:-$JOB}"
+BPM_YML="/var/vcap/jobs/${JOB}/config/bpm.yml"
+RUN_DIR="/var/vcap/sys/run/bpm/${JOB}"
+LOG_DIR="/var/vcap/sys/log/${JOB}"
+DATA_DIR="/var/vcap/data/${JOB}"
+
+mkdir -p "$RUN_DIR" "$LOG_DIR" "$DATA_DIR"
+
+parse_config() {
+  local yml="$1" proc="$2" envfile="$3"
+  local in_proc=0 found=0 in_args=0 in_env=0
+  > "$envfile"
+  while IFS= read -r line; do
+    if echo "$line" | grep -q "^- name:"; then
+      local name
+      name=$(echo "$line" | sed 's/.*name: //')
+      if [ "$name" = "$proc" ]; then found=1; in_proc=1; in_args=0; in_env=0
+      else
+        if [ $found -eq 1 ]; then break; fi
+        in_proc=0; in_args=0; in_env=0
+      fi
+    elif [ $in_proc -eq 1 ]; then
+      if echo "$line" | grep -q "executable:"; then
+        echo "BPM_EXEC=$(echo "$line" | sed 's/.*executable: *//' | tr -d '"')" >> "$envfile"
+        in_args=0; in_env=0
+      elif echo "$line" | grep -q "^  args:"; then
+        # Handle inline array format: args: [web] or args: [arg1, arg2]
+        if echo "$line" | grep -q '\['; then
+          inline_args=$(echo "$line" | sed 's/.*args: *\[//;s/\].*//;s/,/ /g' | tr -d '"')
+          for a in $inline_args; do
+            echo "BPM_ARGS=\"\${BPM_ARGS} ${a}\"" >> "$envfile"
+          done
+          in_args=0; in_env=0
+        else
+          in_args=1; in_env=0
+        fi
+      elif echo "$line" | grep -q "^  env:"; then
+        in_env=1; in_args=0
+      elif echo "$line" | grep -q "^  hooks:"; then
+        in_args=0; in_env=0
+      elif echo "$line" | grep -q "pre_start:"; then
+        hook_path=$(echo "$line" | sed 's/.*pre_start: *//' | tr -d '"')
+        echo "BPM_HOOK_PRE_START=$hook_path" >> "$envfile"
+        in_args=0; in_env=0
+      elif echo "$line" | grep -q "^  limits:"; then
+        in_args=0; in_env=0
+      elif echo "$line" | grep -q "^  capabilities:"; then
+        in_args=0; in_env=0
+      elif echo "$line" | grep -q "ephemeral_disk: true"; then
+        echo "BPM_EPHEMERAL=true" >> "$envfile"
+        in_args=0; in_env=0
+      elif echo "$line" | grep -q "persistent_disk: true"; then
+        echo "BPM_PERSISTENT=true" >> "$envfile"
+        in_args=0; in_env=0
+      elif [ $in_args -eq 1 ] && echo "$line" | grep -q "^  - "; then
+        arg=$(echo "$line" | sed 's/^[[:space:]]*-[[:space:]]*//' | tr -d '"')
+        echo "BPM_ARGS=\"\${BPM_ARGS} ${arg}\"" >> "$envfile"
+      elif [ $in_env -eq 1 ] && echo "$line" | grep -q "    [A-Z]"; then
+        envvar=$(echo "$line" | sed 's/^ *//')
+        key=$(echo "$envvar" | cut -d: -f1)
+        val=$(echo "$envvar" | cut -d: -f2- | sed 's/^ *//' | tr -d '"')
+        echo "export $key=\"$val\"" >> "$envfile"
+      elif [ $in_env -eq 1 ] && [ -z "$(echo "$line" | tr -d '[:space:]')" ]; then
+        # Skip blank lines within env section (don't reset in_env)
+        :
+      elif [ $in_args -eq 1 ] || [ $in_env -eq 1 ]; then
+        case "$line" in
+          *"  -"*|*"  "[A-Z]*) ;;
+          *) in_args=0; in_env=0 ;;
+        esac
+      fi
+    fi
+  done < "$yml"
+}
+
+case "$ACTION" in
+  start)
+    if [ ! -f "$BPM_YML" ]; then
+      echo "Error: $BPM_YML not found" >&2; exit 1
+    fi
+    # If process already running, just exit success
+    PIDFILE="$RUN_DIR/${PROC}.pid"
+    if [ -f "$PIDFILE" ]; then
+      OLDPID=$(cat "$PIDFILE")
+      if kill -0 "$OLDPID" 2>/dev/null; then
+        exit 0
+      fi
+      rm -f "$PIDFILE"
+    fi
+    ENVFILE="/tmp/bpm_env_${JOB}_${PROC}.sh"
+    BPM_EXEC=""
+    BPM_ARGS=""
+    BPM_EPHEMERAL=""
+    BPM_PERSISTENT=""
+    parse_config "$BPM_YML" "$PROC" "$ENVFILE"
+    . "$ENVFILE"
+    if [ -z "$BPM_EXEC" ]; then
+      echo "Error: process $PROC not found in $BPM_YML" >&2; exit 1
+    fi
+    # Create ephemeral disk dirs
+    if [ "$BPM_EPHEMERAL" = "true" ]; then
+      mkdir -p "$DATA_DIR/tmp"
+      mkdir -p "$DATA_DIR/tmp/client_body" 2>/dev/null || true
+    fi
+    # Create persistent disk store dir (real BPM bind-mounts /var/vcap/store)
+    if [ "$BPM_PERSISTENT" = "true" ]; then
+      STORE_DIR="/var/vcap/store/${JOB}"
+      mkdir -p "$STORE_DIR/store"
+      chown -R vcap:vcap "$STORE_DIR" 2>/dev/null || true
+    fi
+    # Run pre-start scripts (only once per job)
+    SENTINEL="$RUN_DIR/.pre-start-done"
+    if [ ! -f "$SENTINEL" ]; then
+      for script in pre-start bpm-pre-start; do
+        if [ -x "/var/vcap/jobs/${JOB}/bin/${script}" ]; then
+          /var/vcap/jobs/${JOB}/bin/${script} >> "$LOG_DIR/pre-start.stdout.log" 2>> "$LOG_DIR/pre-start.stderr.log" || true
+        fi
+      done
+      touch "$SENTINEL"
+    fi
+    # Run BPM-level pre_start hook (defined in bpm.yml, creates env files etc)
+    if [ -n "${BPM_HOOK_PRE_START:-}" ] && [ -x "$BPM_HOOK_PRE_START" ]; then
+      "$BPM_HOOK_PRE_START" >> "$LOG_DIR/pre-start.stdout.log" 2>> "$LOG_DIR/pre-start.stderr.log" || true
+    fi
+    # Ensure vcap user can write to log/run/data dirs
+    chown -R vcap:vcap "$RUN_DIR" "$LOG_DIR" "$DATA_DIR" 2>/dev/null || true
+    # Start the process fully daemonized using double-fork + setsid
+    # Run as vcap user via setpriv (real BPM uses user namespaces where root=vcap)
+    DAEMONIZER="/tmp/bpm_daemon_${JOB}_${PROC}.sh"
+    cat > "$DAEMONIZER" << DAEOF
+#!/bin/bash
+setsid setpriv --reuid=vcap --regid=vcap --init-groups $BPM_EXEC $BPM_ARGS >> "$LOG_DIR/${PROC}.stdout.log" 2>> "$LOG_DIR/${PROC}.stderr.log" </dev/null &
+printf '%s' \$! > "$RUN_DIR/${PROC}.pid"
+DAEOF
+    chmod +x "$DAEMONIZER"
+    # Run the daemonizer in a subshell that closes all inherited fds
+    "$DAEMONIZER" </dev/null >/dev/null 2>/dev/null
+    rm -f "$ENVFILE" "$DAEMONIZER"
+    exit 0
+    ;;
+  stop)
+    PIDFILE="$RUN_DIR/${PROC}.pid"
+    if [ -f "$PIDFILE" ]; then
+      PID=$(cat "$PIDFILE")
+      kill "$PID" 2>/dev/null || true
+      for i in $(seq 1 10); do kill -0 "$PID" 2>/dev/null || break; sleep 1; done
+      kill -9 "$PID" 2>/dev/null || true
+      rm -f "$PIDFILE"
+    fi
+    ;;
+  list)
+    for yml in /var/vcap/jobs/*/config/bpm.yml; do
+      [ -f "$yml" ] || continue
+      jobname=$(echo "$yml" | sed 's|/var/vcap/jobs/||; s|/config/bpm.yml||')
+      grep "name:" "$yml" | sed 's/.*name: //' | while read proc; do
+        pidfile="/var/vcap/sys/run/bpm/${jobname}/${proc}.pid"
+        if [ -f "$pidfile" ] && kill -0 "$(cat "$pidfile")" 2>/dev/null; then
+          echo "${jobname}/${proc}    running"
+        else
+          echo "${jobname}/${proc}    stopped"
+        fi
+      done
+    done
+    ;;
+  *)
+    echo "BPM shim: unknown action $ACTION" >&2; exit 1
+    ;;
+esac

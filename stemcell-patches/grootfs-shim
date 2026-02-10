@@ -1,0 +1,109 @@
+#!/bin/bash
+# grootfs wrapper — skips init-store when XFS store is already mounted
+# In nested containers, losetup fails with "Operation not permitted"
+# because loop device creation requires host-level mount privileges.
+# When the store is pre-mounted from the host, skip init-store entirely
+# and create the required directory structure ourselves.
+
+REAL=/var/vcap/packages/grootfs/bin/grootfs.real
+CONFIG=""
+CMD=""
+ARGS=()
+UID_MAPPINGS=()
+GID_MAPPINGS=()
+
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --config) CONFIG="$2"; ARGS+=("$1" "$2"); shift 2 ;;
+    init-store) CMD="init-store"; ARGS+=("$1"); shift ;;
+    --uid-mapping) UID_MAPPINGS+=("$2"); ARGS+=("$1" "$2"); shift 2 ;;
+    --gid-mapping) GID_MAPPINGS+=("$2"); ARGS+=("$1" "$2"); shift 2 ;;
+    *) ARGS+=("$1"); shift ;;
+  esac
+done
+
+if [ "$CMD" = "init-store" ] && [ -n "$CONFIG" ]; then
+  STORE_PATH=$(sed -n 's/^store: *//p' "$CONFIG")
+  if [ -n "$STORE_PATH" ] && mountpoint -q "$STORE_PATH" 2>/dev/null; then
+    echo "[grootfs-shim] Store $STORE_PATH already mounted, skipping init-store"
+
+    # Determine owner UID/GID from mappings (root mapping: 0:HOSTID:1)
+    OWNER_UID=0
+    OWNER_GID=0
+    for m in "${UID_MAPPINGS[@]}"; do
+      if echo "$m" | grep -q "^0:"; then
+        OWNER_UID=$(echo "$m" | cut -d: -f2)
+      fi
+    done
+    for m in "${GID_MAPPINGS[@]}"; do
+      if echo "$m" | grep -q "^0:"; then
+        OWNER_GID=$(echo "$m" | cut -d: -f2)
+      fi
+    done
+
+    # Create internal directory structure if missing
+    for d in images volumes l locks tmp meta/dependencies projectids; do
+      if [ ! -d "$STORE_PATH/$d" ]; then
+        mkdir -p "$STORE_PATH/$d"
+        chown "$OWNER_UID:$OWNER_GID" "$STORE_PATH/$d" 2>/dev/null || true
+      fi
+    done
+    chown "$OWNER_UID:$OWNER_GID" "$STORE_PATH" "$STORE_PATH/meta" 2>/dev/null || true
+
+    # Create whiteout device if missing
+    if [ ! -e "$STORE_PATH/whiteout_dev" ]; then
+      mknod "$STORE_PATH/whiteout_dev" c 0 0 2>/dev/null || true
+      chown "$OWNER_UID:$OWNER_GID" "$STORE_PATH/whiteout_dev" 2>/dev/null || true
+    fi
+
+    # Create storeDevice if missing (link to backing loop device)
+    if [ ! -e "$STORE_PATH/storeDevice" ]; then
+      BACKING="${STORE_PATH}.backing-store"
+      LOOP_DEV=$(losetup -a 2>/dev/null | grep "$BACKING" | head -1 | cut -d: -f1)
+      if [ -n "$LOOP_DEV" ]; then
+        MINOR=$(stat -c '%T' "$LOOP_DEV" 2>/dev/null)
+        if [ -n "$MINOR" ]; then
+          mknod "$STORE_PATH/storeDevice" b 7 $((16#$MINOR)) 2>/dev/null || true
+        fi
+      fi
+    fi
+
+    # Create namespace.json with UID/GID mappings
+    if [ ! -f "$STORE_PATH/meta/namespace.json" ]; then
+      if [ ${#UID_MAPPINGS[@]} -gt 0 ]; then
+        # Build mappings JSON
+        U_JSON="["
+        first=true
+        for m in "${UID_MAPPINGS[@]}"; do
+          NS=$(echo "$m" | cut -d: -f1)
+          HOST=$(echo "$m" | cut -d: -f2)
+          SIZE=$(echo "$m" | cut -d: -f3)
+          $first || U_JSON="$U_JSON,"
+          U_JSON="$U_JSON{\"HostID\":$HOST,\"NamespaceID\":$NS,\"Size\":$SIZE}"
+          first=false
+        done
+        U_JSON="$U_JSON]"
+        G_JSON="["
+        first=true
+        for m in "${GID_MAPPINGS[@]}"; do
+          NS=$(echo "$m" | cut -d: -f1)
+          HOST=$(echo "$m" | cut -d: -f2)
+          SIZE=$(echo "$m" | cut -d: -f3)
+          $first || G_JSON="$G_JSON,"
+          G_JSON="$G_JSON{\"HostID\":$HOST,\"NamespaceID\":$NS,\"Size\":$SIZE}"
+          first=false
+        done
+        G_JSON="$G_JSON]"
+        echo "{\"UIDMappings\":$U_JSON,\"GIDMappings\":$G_JSON}" > "$STORE_PATH/meta/namespace.json"
+      else
+        echo "{}" > "$STORE_PATH/meta/namespace.json"
+      fi
+      chmod 755 "$STORE_PATH/meta/namespace.json" 2>/dev/null || true
+    fi
+
+    echo "[grootfs-shim] Store directories initialized"
+    exit 0
+  fi
+fi
+
+exec "$REAL" "${ARGS[@]}"

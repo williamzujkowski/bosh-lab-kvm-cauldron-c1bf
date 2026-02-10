@@ -69,6 +69,12 @@ ${SCP_CMD} -r "${REPO_ROOT}/manifests/director/"* "bosh@${MGMT_IP}:/home/bosh/ma
 ${SCP_CMD} -r "${REPO_ROOT}/manifests/cloud-config/"* "bosh@${MGMT_IP}:/home/bosh/manifests/cloud-config/" 2>/dev/null || true
 ${SCP_CMD} -r "${REPO_ROOT}/manifests/concourse/"* "bosh@${MGMT_IP}:/home/bosh/manifests/concourse/" 2>/dev/null || true
 
+# --- Copy stemcell patches to VM ---
+log_step "Copying stemcell patches to VM"
+${SSH_CMD} "mkdir -p /home/bosh/stemcell-patches"
+${SCP_CMD} "${REPO_ROOT}/stemcell-patches/"* "bosh@${MGMT_IP}:/home/bosh/stemcell-patches/"
+${SSH_CMD} "chmod +x /home/bosh/stemcell-patches/*.sh"
+
 # --- Step 1: Install tools ---
 if [ "$SKIP_TOOLS" = false ]; then
   log_step "Installing BOSH + CredHub CLIs on mgmt VM"
@@ -80,7 +86,49 @@ fi
 # --- Step 2: Create Director ---
 if [ "$SKIP_DIRECTOR" = false ]; then
   log_step "Creating BOSH Director with CredHub"
+  # Start create-env (runs detached because it disrupts VM networking)
   ${SSH_CMD} "/home/bosh/bootstrap/remote/create-director.sh" 2>&1 | tee "${LOG_DIR}/create-director.log"
+
+  # Poll for completion — SSH may drop during create-env, so we retry
+  log_step "Waiting for bosh create-env to complete (this takes 10-20 minutes)..."
+  log_info "VM networking may be disrupted during container creation."
+  log_info "You can monitor progress via: virt-manager (VM console)"
+
+  POLL_ATTEMPTS=0
+  MAX_POLL_ATTEMPTS=120  # 120 * 15s = 30 minutes max
+  while [ $POLL_ATTEMPTS -lt $MAX_POLL_ATTEMPTS ]; do
+    POLL_ATTEMPTS=$((POLL_ATTEMPTS + 1))
+    sleep 15
+
+    # Try to check completion status
+    RC_FILE_CONTENT=$(${SSH_CMD} "cat /home/bosh/state/create-env.rc 2>/dev/null" 2>/dev/null || echo "PENDING")
+
+    if [ "$RC_FILE_CONTENT" = "0" ]; then
+      log_info "bosh create-env completed successfully!"
+      # Show the log
+      ${SSH_CMD} "tail -20 /home/bosh/state/create-env.log" 2>/dev/null || true
+      break
+    elif [ "$RC_FILE_CONTENT" != "PENDING" ] && [ "$RC_FILE_CONTENT" != "" ]; then
+      log_warn "bosh create-env failed with exit code: ${RC_FILE_CONTENT}"
+      ${SSH_CMD} "tail -30 /home/bosh/state/create-env.log" 2>/dev/null || true
+      exit 1
+    fi
+
+    # Still running or SSH is down
+    if [ $((POLL_ATTEMPTS % 4)) -eq 0 ]; then
+      ELAPSED=$((POLL_ATTEMPTS * 15))
+      log_info "Still waiting... (${ELAPSED}s elapsed)"
+    fi
+  done
+
+  if [ $POLL_ATTEMPTS -ge $MAX_POLL_ATTEMPTS ]; then
+    log_warn "Timed out waiting for bosh create-env (30 minutes)."
+    exit 1
+  fi
+
+  # Finalize director setup (alias, login)
+  log_step "Finalizing director configuration..."
+  ${SSH_CMD} "/home/bosh/bootstrap/remote/finalize-director.sh" 2>&1 | tee "${LOG_DIR}/finalize-director.log"
 else
   log_info "Skipping director creation (--skip-director)"
 fi

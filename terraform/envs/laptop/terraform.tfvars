@@ -16,7 +16,7 @@ mgmt_vm_disk_gb   = 80
 mgmt_vm_ip        = "10.245.0.2"
 
 # Paths — set by Makefile, override here if needed
-# cloud_image_path = "./state/cache/jammy-server-cloudimg-amd64.img"
+# cloud_image_path = "./state/cache/noble-server-cloudimg-amd64.img"
 # cloud_init_path  = "./cloud-init/mgmt.yaml"
 # state_dir        = "./state"
 # pool_path        = "/var/lib/libvirt/images/bosh-lab"
