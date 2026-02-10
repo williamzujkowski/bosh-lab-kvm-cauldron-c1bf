@@ -30,7 +30,7 @@ CLOUD_IMAGE_URL := https://cloud-images.ubuntu.com/jammy/current/jammy-server-cl
 # VM access
 MGMT_IP     := 10.245.0.2
 SSH_KEY     := $(STATE_DIR)/creds/mgmt_ssh
-SSH_OPTS    := -i $(SSH_KEY) -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o LogLevel=ERROR
+SSH_OPTS    := -i $(SSH_KEY) -o IdentitiesOnly=yes -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o LogLevel=ERROR
 
 .PHONY: help up bootstrap concourse env test status logs down reset doctor image setup
 

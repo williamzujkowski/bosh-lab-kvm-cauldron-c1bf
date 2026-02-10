@@ -41,7 +41,7 @@ else
 fi
 
 MGMT_IP="10.245.0.2"
-SSH_OPTS="-i ${SSH_KEY} -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ConnectTimeout=10 -o LogLevel=ERROR"
+SSH_OPTS="-i ${SSH_KEY} -o IdentitiesOnly=yes -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ConnectTimeout=10 -o LogLevel=ERROR"
 SSH_CMD="ssh ${SSH_OPTS} bosh@${MGMT_IP}"
 SCP_CMD="scp ${SSH_OPTS}"
 

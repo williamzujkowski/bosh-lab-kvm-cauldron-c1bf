@@ -6,7 +6,6 @@
 set -euo pipefail
 
 BOSH_DEPLOYMENT_COMMIT="faf834a"
-LIBVIRT_CPI_VERSION="4.1"
 STATE_DIR="/mnt/state"
 LOCAL_STATE="/home/bosh/state"
 DEPLOY_DIR="/home/bosh/bosh-deployment"
@@ -51,19 +50,18 @@ echo "[create-director] Running bosh create-env..."
 bosh create-env "${DEPLOY_DIR}/bosh.yml" \
   --state="$DIRECTOR_STATE" \
   --vars-store="$VARS_STORE" \
-  -o "${DEPLOY_DIR}/virtualbox/cpi.yml" \
-  -o "${DEPLOY_DIR}/virtualbox/outbound-network.yml" \
+  -o "${DEPLOY_DIR}/warden/cpi.yml" \
   -o "${DEPLOY_DIR}/bosh-lite.yml" \
   -o "${DEPLOY_DIR}/bosh-lite-runc.yml" \
-  -o "${DEPLOY_DIR}/credhub.yml" \
+  -o "${DEPLOY_DIR}/warden/use-jammy.yml" \
   -o "${DEPLOY_DIR}/uaa.yml" \
+  -o "${DEPLOY_DIR}/credhub.yml" \
   -o "${DEPLOY_DIR}/jumpbox-user.yml" \
-  -o /home/bosh/manifests/director/ops/libvirt-cpi.yml \
   -v director_name=bosh-lab \
   -v internal_ip=10.245.0.2 \
   -v internal_gw=10.245.0.1 \
   -v internal_cidr=10.245.0.0/24 \
-  -v outbound_network_name=NatNetwork \
+  -v garden_host=127.0.0.1 \
   2>&1
 
 # --- Alias the environment ---

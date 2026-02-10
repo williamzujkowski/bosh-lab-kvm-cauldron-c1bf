@@ -4,8 +4,8 @@
 
 set -euo pipefail
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
+COMMON_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(cd "$COMMON_DIR/../.." && pwd)"
 STATE_DIR="${REPO_ROOT}/state"
 CREDS_DIR="${STATE_DIR}/creds"
 CA_DIR="${STATE_DIR}/ca"
