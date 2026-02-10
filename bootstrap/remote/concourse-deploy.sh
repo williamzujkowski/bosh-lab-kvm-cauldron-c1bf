@@ -110,6 +110,17 @@ else
   echo "[concourse-deploy] Concourse release already uploaded."
 fi
 
+# --- Clean up stale deployment if agent is unresponsive ---
+# On re-runs, the existing VM's agent may be unresponsive (e.g., after host
+# hibernation or container restarts). Force-delete to avoid "Timed out
+# sending 'get_state'" errors that block the new deployment.
+EXISTING=$(bosh -e lab -d concourse instances --json 2>/dev/null | jq -r '.Tables[0].Rows // [] | length' 2>/dev/null || echo "0")
+if [ "${EXISTING:-0}" != "0" ]; then
+  echo "[concourse-deploy] Cleaning up existing deployment..."
+  bosh -e lab delete-deployment -d concourse --force -n 2>/dev/null || true
+  sleep 3
+fi
+
 # --- Deploy Concourse ---
 echo "[concourse-deploy] Deploying Concourse..."
 CONCOURSE_MANIFEST="/home/bosh/manifests/concourse/concourse.yml"
