@@ -6,9 +6,9 @@ set -euo pipefail
 
 STATE_DIR="/mnt/state"
 VARS_STORE="${STATE_DIR}/vars-store.yml"
-CONCOURSE_RELEASE_VERSION="7.14.1"
+CONCOURSE_RELEASE_VERSION="8.0.1"
 STEMCELL_LINE="ubuntu-jammy"
-STEMCELL_VERSION="1.717"
+STEMCELL_VERSION="1.1044"
 
 # --- Set up BOSH auth ---
 export BOSH_ENVIRONMENT=lab

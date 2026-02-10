@@ -1,19 +1,19 @@
 # Concourse deployment manifest for BOSH lab
 # Deployed via BOSH onto the local libvirt IaaS.
-# Version: Concourse 7.14.1
+# Version: Concourse 8.0.1
 
 name: ((deployment_name))
 
 releases:
   - name: concourse
-    version: "7.14.1"
+    version: "8.0.1"
   - name: bpm
     version: latest  # Pulled from director's uploaded releases
 
 stemcells:
   - alias: default
     os: ubuntu-jammy
-    version: "1.717"
+    version: "1.1044"
 
 instance_groups:
   - name: web

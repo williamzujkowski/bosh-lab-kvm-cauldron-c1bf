@@ -20,7 +20,7 @@ One-command BOSH + CredHub + Concourse local lab on KVM/libvirt. Deterministic, 
 | RAM | 32 GB | 64 GB |
 | CPU | 8 threads | 16 threads |
 | Disk | 100 GB free | 200 GB free |
-| Terraform | 1.9+ | 1.9.8 |
+| Terraform | 1.13+ | 1.14.4 |
 
 ```bash
 # Install libvirt
@@ -113,14 +113,14 @@ make bootstrap               # Idempotent — converges without recreating
 |---|---|
 | bosh-cli | 7.9.17 |
 | credhub-cli | 2.9.53 |
-| bosh-deployment | commit `94a3c51e` |
+| bosh-deployment | commit `faf834a` |
 | libvirt CPI | v4.1 |
-| Concourse release | 7.14.1 |
-| Stemcell | ubuntu-jammy/1.717 |
-| fly CLI | 7.14.1 |
+| Concourse release | 8.0.1 |
+| Stemcell | ubuntu-jammy/1.1044 |
+| fly CLI | 8.0.1 |
 | Ubuntu cloud image | 22.04 LTS (Jammy) |
-| Terraform | >= 1.9.0 |
-| terraform-provider-libvirt | ~> 0.8.1 |
+| Terraform | >= 1.13.0 |
+| terraform-provider-libvirt | ~> 0.9.2 |
 
 ## Architecture
 

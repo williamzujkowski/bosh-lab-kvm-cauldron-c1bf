@@ -120,14 +120,14 @@ Every external dependency is pinned to a specific version. No `latest` tags.
 |---|---|---|
 | bosh-cli | 7.9.17 | `bootstrap/lib/common.sh`, `bootstrap/remote/install-tools.sh` |
 | credhub-cli | 2.9.53 | `bootstrap/lib/common.sh`, `bootstrap/remote/install-tools.sh` |
-| bosh-deployment | commit `94a3c51e` | `bootstrap/lib/common.sh`, `bootstrap/remote/create-director.sh` |
+| bosh-deployment | commit `faf834a` | `bootstrap/lib/common.sh`, `bootstrap/remote/create-director.sh` |
 | libvirt CPI | v4.1 | `manifests/director/ops/libvirt-cpi.yml` |
-| Concourse release | 7.14.1 | `manifests/concourse/concourse.yml` |
-| Stemcell | ubuntu-jammy/1.717 | `manifests/concourse/concourse.yml`, cloud-config |
-| fly CLI | 7.14.1 | `bootstrap/remote/install-tools.sh` |
+| Concourse release | 8.0.1 | `manifests/concourse/concourse.yml` |
+| Stemcell | ubuntu-jammy/1.1044 | `manifests/concourse/concourse.yml`, cloud-config |
+| fly CLI | 8.0.1 | `bootstrap/remote/install-tools.sh` |
 | Ubuntu cloud image | jammy (22.04 LTS) | `Makefile` (downloaded to cache) |
-| Terraform | >= 1.9.0 | `terraform/versions.tf` |
-| terraform-provider-libvirt | ~> 0.8.1 | `terraform/versions.tf` |
+| Terraform | >= 1.13.0 | `terraform/versions.tf` |
+| terraform-provider-libvirt | ~> 0.9.2 | `terraform/versions.tf` |
 
 **Update process:** Change the version in the pin location, run `make reset && make up && make bootstrap`, verify acceptance tests pass.
 

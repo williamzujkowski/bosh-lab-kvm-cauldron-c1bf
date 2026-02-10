@@ -8,7 +8,7 @@ set -euo pipefail
 # Version pins
 BOSH_CLI_VERSION="7.9.17"
 CREDHUB_CLI_VERSION="2.9.53"
-FLY_VERSION="7.14.1"
+FLY_VERSION="8.0.1"
 
 echo "[install-tools] Checking bosh-cli..."
 if command -v bosh &>/dev/null && bosh --version 2>/dev/null | grep -q "${BOSH_CLI_VERSION}"; then

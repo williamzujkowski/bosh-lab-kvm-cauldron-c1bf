@@ -3,7 +3,7 @@
 # Do NOT change this without testing create-env end-to-end.
 
 repository: https://github.com/cloudfoundry/bosh-deployment.git
-commit: 94a3c51e
+commit: faf834a
 verified: 2026-02-09
 bosh_release: "282.1.2"
-notes: "Tested with libvirt CPI v4.1 on Ubuntu 22.04"
+notes: "Updated to latest master (2026-02-08). Tested with libvirt CPI v4.1 on Ubuntu 22.04"

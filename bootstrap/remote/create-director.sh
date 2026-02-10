@@ -5,7 +5,7 @@
 
 set -euo pipefail
 
-BOSH_DEPLOYMENT_COMMIT="94a3c51e"
+BOSH_DEPLOYMENT_COMMIT="faf834a"
 LIBVIRT_CPI_VERSION="4.1"
 STATE_DIR="/mnt/state"
 LOCAL_STATE="/home/bosh/state"

@@ -46,8 +46,8 @@ sudo systemctl enable libvirtd
 git clone https://github.com/tfutils/tfenv.git ~/.tfenv
 echo 'export PATH="$HOME/.tfenv/bin:$PATH"' >> ~/.bashrc
 source ~/.bashrc
-tfenv install 1.9.8
-tfenv use 1.9.8
+tfenv install 1.14.4
+tfenv use 1.14.4
 ```
 
 ---
@@ -173,7 +173,7 @@ bosh -e lab stemcells
 
 # Upload manually if needed
 bosh -e lab upload-stemcell \
-  "https://bosh.io/d/stemcells/bosh-warden-boshlite-ubuntu-jammy-go_agent?v=1.717"
+  "https://bosh.io/d/stemcells/bosh-warden-boshlite-ubuntu-jammy-go_agent?v=1.1044"
 ```
 
 ### Concourse deploy times out

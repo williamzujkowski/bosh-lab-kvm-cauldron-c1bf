@@ -162,7 +162,7 @@ doctor: ## Check host prerequisites
 	else echo "  FAIL: libvirtd not running. Run: sudo systemctl start libvirtd"; ERRORS=$$((ERRORS+1)); fi; \
 	echo "--- Terraform ---"; \
 	if command -v terraform >/dev/null 2>&1; then echo "  OK: terraform found ($$(terraform version -json 2>/dev/null | jq -r .terraform_version 2>/dev/null || terraform version | head -1))"; \
-	else echo "  FAIL: terraform not found. Install terraform >= 1.9."; ERRORS=$$((ERRORS+1)); fi; \
+	else echo "  FAIL: terraform not found. Install terraform >= 1.13."; ERRORS=$$((ERRORS+1)); fi; \
 	echo "--- SSH ---"; \
 	if command -v ssh >/dev/null 2>&1; then echo "  OK: ssh found"; \
 	else echo "  FAIL: ssh not found."; ERRORS=$$((ERRORS+1)); fi; \
