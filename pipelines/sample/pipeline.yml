@@ -1,0 +1,70 @@
+# Sample Concourse pipeline for the BOSH lab
+# Demonstrates deploying and tearing down a minimal BOSH deployment.
+#
+# Usage:
+#   fly -t lab set-pipeline -p sample -c pipelines/sample/pipeline.yml
+#   fly -t lab unpause-pipeline -p sample
+#   fly -t lab trigger-job -j sample/deploy-and-teardown
+
+resources:
+  - name: timer
+    type: time
+    source:
+      interval: 24h
+
+jobs:
+  - name: deploy-and-teardown
+    plan:
+      - get: timer
+        trigger: false
+
+      - task: deploy-zookeeper
+        config:
+          platform: linux
+          image_resource:
+            type: registry-image
+            source:
+              repository: ubuntu
+              tag: "22.04"
+          params:
+            BOSH_ENVIRONMENT: ((bosh_environment))
+            BOSH_CLIENT: ((bosh_client))
+            BOSH_CLIENT_SECRET: ((bosh_client_secret))
+            BOSH_CA_CERT: ((bosh_ca_cert))
+          run:
+            path: bash
+            args:
+              - -exc
+              - |
+                apt-get update && apt-get install -y curl
+                # Install bosh CLI
+                curl -sSL "https://github.com/cloudfoundry/bosh-cli/releases/download/v7.9.17/bosh-cli-7.9.17-linux-amd64" -o /usr/local/bin/bosh
+                chmod +x /usr/local/bin/bosh
+
+                # Deploy zookeeper (minimal BOSH deployment for smoke testing)
+                bosh -e "$BOSH_ENVIRONMENT" -d zookeeper deploy \
+                  <(curl -sSL https://raw.githubusercontent.com/cppforlife/zookeeper-release/master/manifests/zookeeper.yml) \
+                  -n
+
+                echo "Zookeeper deployed successfully."
+
+                # Verify
+                bosh -e "$BOSH_ENVIRONMENT" -d zookeeper instances
+
+                # Teardown
+                echo "Tearing down zookeeper..."
+                bosh -e "$BOSH_ENVIRONMENT" -d zookeeper delete-deployment -n
+
+                echo "Deploy-and-teardown cycle complete."
+
+      - task: report
+        config:
+          platform: linux
+          image_resource:
+            type: registry-image
+            source:
+              repository: ubuntu
+              tag: "22.04"
+          run:
+            path: echo
+            args: ["Pipeline execution successful."]

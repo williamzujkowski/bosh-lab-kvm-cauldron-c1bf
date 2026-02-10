@@ -1,0 +1,64 @@
+#cloud-config
+# Management VM cloud-init for BOSH lab
+# OS: Ubuntu 22.04 LTS (Jammy)
+
+hostname: bosh-lab-mgmt
+manage_etc_hosts: true
+locale: en_US.UTF-8
+timezone: UTC
+
+users:
+  - name: bosh
+    groups: sudo
+    shell: /bin/bash
+    sudo: ALL=(ALL) NOPASSWD:ALL
+    lock_passwd: true
+    ssh_authorized_keys: []  # Populated by bootstrap.sh
+
+package_update: true
+package_upgrade: false
+
+packages:
+  - build-essential
+  - git
+  - curl
+  - wget
+  - jq
+  - unzip
+  - ruby
+  - libxml2-dev
+  - libsqlite3-dev
+  - libxslt1-dev
+  - libpq-dev
+  - libmysqlclient-dev
+  - zlib1g-dev
+  - qemu-kvm
+  - libvirt-daemon-system
+  - libvirt-dev
+  - virtinst
+  - bridge-utils
+  - ca-certificates
+  - openssh-server
+
+# Mount host state directory via 9p
+mounts:
+  - ["state", "/mnt/state", "9p", "trans=virtio,version=9p2000.L,rw", "0", "0"]
+
+# Ensure mount point exists
+runcmd:
+  - mkdir -p /mnt/state
+  - mount -a || true
+  - chown -R bosh:bosh /mnt/state || true
+  # Enable nested KVM if not already
+  - modprobe kvm_intel nested=1 || modprobe kvm_amd nested=1 || true
+  - echo "Cloud-init complete. Ready for bootstrap." > /var/log/bosh-lab-init.log
+
+write_files:
+  - path: /etc/sysctl.d/99-bosh-lab.conf
+    content: |
+      net.ipv4.ip_forward=1
+      net.bridge.bridge-nf-call-iptables=0
+      net.bridge.bridge-nf-call-ip6tables=0
+    permissions: "0644"
+
+final_message: "BOSH Lab mgmt VM ready after $UPTIME seconds"

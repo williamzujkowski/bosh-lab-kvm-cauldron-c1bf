@@ -1,0 +1,9 @@
+# bosh-deployment version lock
+# This file records the pinned commit used for director creation.
+# Do NOT change this without testing create-env end-to-end.
+
+repository: https://github.com/cloudfoundry/bosh-deployment.git
+commit: 94a3c51e
+verified: 2026-02-09
+bosh_release: "282.1.2"
+notes: "Tested with libvirt CPI v4.1 on Ubuntu 22.04"

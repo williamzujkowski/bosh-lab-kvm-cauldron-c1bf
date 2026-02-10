@@ -1,0 +1,6 @@
+# Runtime-config for the BOSH lab
+# Minimal for MVP — add addons here as needed (e.g., os-conf, syslog).
+
+releases: []
+
+addons: []

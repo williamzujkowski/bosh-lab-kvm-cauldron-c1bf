@@ -1,0 +1,50 @@
+# Cloud-config for the BOSH lab (libvirt / bosh-lite style)
+# Defines VM types, disk types, networks, and compilation settings.
+
+azs:
+  - name: z1
+    cloud_properties: {}
+
+vm_types:
+  - name: default
+    cloud_properties:
+      ram: 2048
+      cpu: 2
+  - name: small
+    cloud_properties:
+      ram: 1024
+      cpu: 1
+  - name: large
+    cloud_properties:
+      ram: 4096
+      cpu: 4
+
+disk_types:
+  - name: default
+    disk_size: 10240
+  - name: large
+    disk_size: 51200
+
+networks:
+  - name: default
+    type: manual
+    subnets:
+      - range: 10.245.0.0/24
+        gateway: 10.245.0.1
+        az: z1
+        dns:
+          - 10.245.0.1
+          - 8.8.8.8
+        reserved:
+          - 10.245.0.1-10.245.0.9     # Gateway + management
+        static:
+          - 10.245.0.10-10.245.0.50    # Static IPs for deployments
+        cloud_properties:
+          name: bosh-lab
+
+compilation:
+  workers: 2
+  reuse_compilation_vms: true
+  az: z1
+  vm_type: large
+  network: default

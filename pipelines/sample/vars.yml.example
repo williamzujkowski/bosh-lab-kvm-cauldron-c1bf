@@ -1,0 +1,7 @@
+# Pipeline variables for the sample pipeline
+# Copy to vars.yml and fill in values from 'make env'
+
+bosh_environment: "10.245.0.2"
+bosh_client: "admin"
+bosh_client_secret: ""  # From: bosh int state/vars-store.yml --path /admin_password
+bosh_ca_cert: ""        # From: bosh int state/vars-store.yml --path /director_ssl/ca

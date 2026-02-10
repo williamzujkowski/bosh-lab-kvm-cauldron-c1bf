@@ -1,0 +1,12 @@
+# Example vars file for Concourse deployment
+# Copy to vars.yml and customize as needed.
+# Most values are set via the Makefile / deploy script.
+
+external_url: "https://127.0.0.1:8443"
+web_ip: "10.245.0.10"
+network_name: "default"
+web_vm_type: "default"
+db_vm_type: "default"
+worker_vm_type: "default"
+db_persistent_disk_type: "default"
+deployment_name: "concourse"

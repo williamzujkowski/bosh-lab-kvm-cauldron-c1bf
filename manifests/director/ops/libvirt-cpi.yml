@@ -1,0 +1,49 @@
+# Ops file: Override VirtualBox CPI with libvirt CPI
+# Applied during bosh create-env to use KVM/libvirt instead of VirtualBox.
+#
+# The libvirt CPI (a2geek/libvirt-bosh-cpi) provides BOSH with the ability
+# to manage VMs via libvirt, targeting local KVM hypervisors.
+
+# Replace the CPI release
+- type: replace
+  path: /releases/name=bosh-virtualbox-cpi?
+  value:
+    name: libvirt-cpi
+    url: https://github.com/a2geek/libvirt-bosh-cpi/releases/download/v4.1/libvirt-cpi-4.1.tgz
+    sha1: ""  # Fill after first download or use --sha2 flag
+
+# Replace CPI job configuration
+- type: replace
+  path: /resource_pools/name=vms/stemcell
+  value:
+    url: https://bosh.io/d/stemcells/bosh-warden-boshlite-ubuntu-jammy-go_agent?v=1.717
+    sha1: ""  # Fill after first download
+
+# Update CPI job
+- type: replace
+  path: /instance_groups/name=bosh/jobs/name=virtualbox_cpi?
+  value:
+    name: libvirt_cpi
+    release: libvirt-cpi
+    properties:
+      libvirt:
+        host: "qemu:///system"
+        storage_pool: "bosh-lab"
+        network:
+          name: "bosh-lab"
+          type: "manual"
+
+# Override cloud provider
+- type: replace
+  path: /cloud_provider
+  value:
+    template:
+      name: libvirt_cpi
+      release: libvirt-cpi
+    properties:
+      libvirt:
+        host: "qemu:///system"
+        storage_pool: "bosh-lab"
+        network:
+          name: "bosh-lab"
+          type: "manual"

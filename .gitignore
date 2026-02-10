@@ -1,0 +1,25 @@
+# State directory — source of truth for creds, certs, caches, logs, terraform
+state/
+
+# Terraform
+*.tfstate
+*.tfstate.backup
+.terraform/
+.terraform.lock.hcl
+
+# Editor
+*.swp
+*.swo
+*~
+.idea/
+.vscode/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Secrets (paranoia belt)
+*.pem
+*.key
+vars-store.yml
+creds.yml
