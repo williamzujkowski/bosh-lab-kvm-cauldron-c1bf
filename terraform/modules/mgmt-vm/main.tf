@@ -38,6 +38,14 @@ variable "pool_path" {
   type = string
 }
 
+variable "network_gateway" {
+  type = string
+}
+
+variable "network_cidr" {
+  type = string
+}
+
 # Storage pool for VM disks
 resource "libvirt_pool" "bosh_lab" {
   name = "bosh-lab"
@@ -89,6 +97,24 @@ resource "libvirt_cloudinit_disk" "mgmt_init" {
     instance-id    = var.vm_name
     local-hostname = var.vm_name
   })
+  network_config = yamlencode({
+    version = 2
+    ethernets = {
+      eth0 = {
+        match = {
+          macaddress = "52:54:00:b0:5e:02"
+        }
+        addresses = ["${var.static_ip}/${split("/", var.network_cidr)[1]}"]
+        routes = [{
+          to      = "0.0.0.0/0"
+          via     = var.network_gateway
+        }]
+        nameservers = {
+          addresses = [var.network_gateway]
+        }
+      }
+    }
+  })
 }
 
 # Management VM
@@ -99,24 +125,32 @@ resource "libvirt_domain" "mgmt" {
   memory_unit = "MiB"
   vcpu        = var.vcpu
 
+  os = {
+    type = "hvm"
+  }
+
   cpu = {
     mode = "host-passthrough"
   }
 
   devices = {
     interfaces = [{
+      mac = {
+        address = "52:54:00:b0:5e:02"
+      }
       source = {
         network = {
           network = var.network_name
         }
       }
-      ip = [{
-        address = var.static_ip
-      }]
     }]
 
     disks = [
       {
+        target = {
+          dev = "vda"
+          bus = "virtio"
+        }
         source = {
           volume = {
             pool   = libvirt_pool.bosh_lab.name
@@ -126,6 +160,10 @@ resource "libvirt_domain" "mgmt" {
       },
       {
         device = "cdrom"
+        target = {
+          dev = "sda"
+          bus = "sata"
+        }
         source = {
           file = {
             file = libvirt_cloudinit_disk.mgmt_init.path

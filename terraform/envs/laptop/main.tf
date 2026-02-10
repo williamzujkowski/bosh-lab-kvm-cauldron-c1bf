@@ -14,7 +14,9 @@ module "mgmt_vm" {
   memory_mb       = var.mgmt_vm_memory_mb
   disk_gb         = var.mgmt_vm_disk_gb
   static_ip       = var.mgmt_vm_ip
-  network_name    = module.network.network_name
+  network_name     = module.network.network_name
+  network_gateway  = var.network_gateway
+  network_cidr     = var.network_cidr
   cloud_image_path = var.cloud_image_path
   cloud_init_path  = var.cloud_init_path
   state_dir       = var.state_dir
