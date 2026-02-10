@@ -7,6 +7,9 @@ state/
 .terraform/
 .terraform.lock.hcl
 
+# mkdocs build output
+site/
+
 # Editor
 *.swp
 *.swo

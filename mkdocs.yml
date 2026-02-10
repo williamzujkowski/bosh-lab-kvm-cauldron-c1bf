@@ -1,0 +1,54 @@
+site_name: BOSH Lab KVM
+site_description: One-command BOSH + CredHub + Concourse local lab on KVM/libvirt
+site_url: https://williamzujkowski.github.io/bosh-lab-kvm-cauldron-c1bf/
+repo_url: https://github.com/williamzujkowski/bosh-lab-kvm-cauldron-c1bf
+repo_name: bosh-lab-kvm-cauldron-c1bf
+
+theme:
+  name: material
+  palette:
+    - scheme: default
+      primary: deep purple
+      accent: amber
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+    - scheme: slate
+      primary: deep purple
+      accent: amber
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode
+  features:
+    - content.code.copy
+    - navigation.sections
+    - navigation.expand
+    - navigation.top
+    - search.highlight
+    - toc.integrate
+  icon:
+    repo: fontawesome/brands/github
+
+markdown_extensions:
+  - admonition
+  - pymdownx.details
+  - pymdownx.superfences
+  - pymdownx.tabbed:
+      alternate_style: true
+  - tables
+  - toc:
+      permalink: true
+
+nav:
+  - Home: index.md
+  - Architecture:
+      - Design: design.md
+      - Security: security-notes.md
+  - Operations:
+      - Troubleshooting: troubleshooting.md
+  - Terraform Reference:
+      - Overview: terraform/index.md
+      - Environment - Laptop: terraform/env-laptop.md
+      - Modules:
+          - libvirt-network: terraform/module-libvirt-network.md
+          - mgmt-vm: terraform/module-mgmt-vm.md
