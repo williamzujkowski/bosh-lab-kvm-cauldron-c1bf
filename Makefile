@@ -114,7 +114,7 @@ test: ## Run acceptance tests
 		echo "FAIL: CredHub smoke test failed"; FAIL=$$((FAIL+1)); \
 	fi; \
 	echo "--- Test 3: Concourse deployment exists ---"; \
-	if ssh $(SSH_OPTS) bosh@$(MGMT_IP) "bosh -e lab -d concourse instances" 2>/dev/null; then \
+	if ssh $(SSH_OPTS) bosh@$(MGMT_IP) 'export BOSH_ENVIRONMENT=lab BOSH_CLIENT=admin; export BOSH_CLIENT_SECRET=$$(bosh int /mnt/state/vars-store.yml --path /admin_password 2>/dev/null); export BOSH_CA_CERT="$$(bosh int /mnt/state/vars-store.yml --path /director_ssl/ca 2>/dev/null)"; bosh -d concourse instances' 2>/dev/null; then \
 		echo "PASS"; PASS=$$((PASS+1)); \
 	else \
 		echo "FAIL: Concourse deployment not found"; FAIL=$$((FAIL+1)); \

@@ -155,9 +155,10 @@ fi
 log_step "Syncing credentials back to host state directory"
 ${SCP_CMD} "bosh@${MGMT_IP}:/home/bosh/state/creds.yml" "${CREDS_DIR}/creds.yml" 2>/dev/null || true
 ${SCP_CMD} "bosh@${MGMT_IP}:/home/bosh/state/vars-store.yml" "${STATE_DIR}/vars-store.yml" 2>/dev/null || true
+${SCP_CMD} "bosh@${MGMT_IP}:/mnt/state/creds/concourse-vars.yml" "${CREDS_DIR}/concourse-vars.yml" 2>/dev/null || true
 
 echo ""
 log_step "Bootstrap complete!"
 log_info "BOSH Director: ${MGMT_IP}"
 log_info "Run 'make env' to set up your shell, then 'bosh -e lab env' to verify."
-log_info "Concourse UI: ${CONCOURSE_EXTERNAL_URL} (after 'make concourse')"
+log_info "Concourse UI: ${CONCOURSE_EXTERNAL_URL} (via SSH tunnel: ssh -L 8080:${CONCOURSE_WEB_IP}:8080 bosh@${MGMT_IP})"

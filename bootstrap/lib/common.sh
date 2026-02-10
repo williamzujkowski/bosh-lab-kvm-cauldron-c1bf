@@ -34,7 +34,7 @@ BOSH_DIRECTOR_NAME="bosh-lab"
 
 # Concourse
 CONCOURSE_WEB_IP="10.245.0.10"
-CONCOURSE_EXTERNAL_URL="https://127.0.0.1:8443"
+CONCOURSE_EXTERNAL_URL="http://127.0.0.1:8080"
 
 # Source logging
 # shellcheck source=bootstrap/lib/log.sh

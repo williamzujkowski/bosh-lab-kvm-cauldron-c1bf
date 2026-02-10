@@ -44,11 +44,14 @@ export CREDHUB_CA_CERT='${BOSH_CA_CERT}'
 # SSH to mgmt VM
 alias bosh-ssh="ssh -i ${SSH_KEY} -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null bosh@${MGMT_IP}"
 
-# Concourse tunnel (run in separate terminal)
-alias concourse-tunnel="ssh -i ${SSH_KEY} -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -L 8443:10.245.0.10:443 -N bosh@${MGMT_IP}"
+# Concourse tunnel (run in separate terminal, then visit http://127.0.0.1:8080)
+alias concourse-tunnel="ssh -i ${SSH_KEY} -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -L 8080:10.245.0.10:8080 -N bosh@${MGMT_IP}"
+
+# BOSH Director tunnel (run in separate terminal, then use bosh -e 127.0.0.1)
+alias bosh-tunnel="ssh -i ${SSH_KEY} -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -L 25555:192.168.50.6:25555 -N bosh@${MGMT_IP}"
 
 echo "BOSH Lab environment configured." >&2
-echo "  bosh -e ${MGMT_IP} env" >&2
-echo "  bosh-ssh  (alias to SSH into mgmt VM)" >&2
-echo "  concourse-tunnel  (alias to set up Concourse SSH tunnel)" >&2
+echo "  bosh-ssh         (SSH into mgmt VM)" >&2
+echo "  bosh-tunnel      (tunnel BOSH director to localhost:25555)" >&2
+echo "  concourse-tunnel (tunnel Concourse UI to localhost:8080)" >&2
 EOF

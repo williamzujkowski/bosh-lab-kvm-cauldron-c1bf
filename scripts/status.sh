@@ -8,7 +8,7 @@ REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 STATE_DIR="${REPO_ROOT}/state"
 SSH_KEY="${STATE_DIR}/creds/mgmt_ssh"
 MGMT_IP="10.245.0.2"
-SSH_OPTS="-i ${SSH_KEY} -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ConnectTimeout=5 -o LogLevel=ERROR"
+SSH_OPTS="-i ${SSH_KEY} -o IdentitiesOnly=yes -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ConnectTimeout=10 -o LogLevel=ERROR"
 
 echo "=== BOSH Lab Status ==="
 echo ""
@@ -41,9 +41,8 @@ if [ -f "$SSH_KEY" ] && ssh ${SSH_OPTS} bosh@${MGMT_IP} true 2>/dev/null; then
   # --- BOSH Director ---
   echo ""
   echo "--- BOSH Director ---"
-  if ssh ${SSH_OPTS} bosh@${MGMT_IP} "bosh -e lab env 2>/dev/null" 2>/dev/null; then
+  if ssh ${SSH_OPTS} bosh@${MGMT_IP} "bosh -e lab env" 2>/dev/null; then
     echo "  Director: RUNNING"
-    ssh ${SSH_OPTS} bosh@${MGMT_IP} "bosh -e lab env 2>/dev/null" 2>/dev/null | head -5 || true
   else
     echo "  Director: NOT RESPONDING (run 'make bootstrap')"
   fi
@@ -51,9 +50,9 @@ if [ -f "$SSH_KEY" ] && ssh ${SSH_OPTS} bosh@${MGMT_IP} true 2>/dev/null; then
   # --- Concourse ---
   echo ""
   echo "--- Concourse ---"
-  if ssh ${SSH_OPTS} bosh@${MGMT_IP} "bosh -e lab -d concourse instances 2>/dev/null" 2>/dev/null; then
+  BOSH_AUTH='export BOSH_ENVIRONMENT=lab BOSH_CLIENT=admin; export BOSH_CLIENT_SECRET=$(bosh int /mnt/state/vars-store.yml --path /admin_password 2>/dev/null); export BOSH_CA_CERT="$(bosh int /mnt/state/vars-store.yml --path /director_ssl/ca 2>/dev/null)"'
+  if ssh ${SSH_OPTS} bosh@${MGMT_IP} "${BOSH_AUTH}; bosh -d concourse instances" 2>/dev/null; then
     echo "  Concourse: DEPLOYED"
-    ssh ${SSH_OPTS} bosh@${MGMT_IP} "bosh -e lab -d concourse instances 2>/dev/null" 2>/dev/null || true
   else
     echo "  Concourse: NOT DEPLOYED (run 'make concourse')"
   fi
